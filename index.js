@@ -9,11 +9,8 @@ const app = express();
 app.use(cors())
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json())
-app.use("api/v1/tours",toursRoutes)
+app.use("/api/v1/tours",toursRoutes)
 
-app.get("/", async (req, res) => {
-  res.status(200).send("hello world");
-});
 
 const startServer = async () => {
   try {
