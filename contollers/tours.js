@@ -1,8 +1,65 @@
 import Tour from "../mongo/models/tours.js";
 
+const aliasCheapTours = (req, res, next) => {
+  req.query.limit = "5";
+  req.query.sort = "price,-ratingsAverage"; //ratings from the lowest
+  req.query.fields = "name,price,ratingAverage,summary,difficulty";
+  next();
+};
+
 const getTours = async (req, res) => {
   try {
-    const data = await Tour.find({});
+    //Build query
+    //1) Filtering
+    const query = { ...req.query }; //make a copy in order to be able to exclude some queries
+    const excludedfields = ["page", "sort", "limit", "fields"];
+    excludedfields.forEach((el) => delete query[el]);
+
+    //2) Advanced filtering
+    //for gte,lte,lt,gt
+    console.log(req.query, query);
+    let querystr = JSON.stringify(query);
+    querystr = querystr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+    console.log(JSON.parse(querystr));
+
+    let somequery = Tour.find(JSON.parse(querystr));
+
+    //3) Sorting
+    // if (req.query.sort) {
+    //   somequery = somequery.sort(req.query.sort);
+    // }
+    // incase of a seconf argument to break the tie
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(",").join(" ");
+      somequery = somequery.sort(sortBy);
+    } else {
+      somequery = somequery.sort("-createdAt");
+    }
+
+    //4) Field limiting
+    if (req.query.fields) {
+      const fields = req.query.fields.split(",").join(" ");
+      somequery = somequery.select(fields);
+    } else {
+      somequery = somequery.select("-__v"); //remove this field
+    }
+
+    //5) Pagination
+    const page = req.query.page * 1 || 1;
+    const limit = req.query.limit * 1 || 10;
+    const skip = (page - 1) * limit;
+    somequery = somequery.skip(skip).limit(limit);
+
+    //if the page doesnot exists
+    if (req.query.page) {
+      const numTours = await Tour.countDocuments();
+      if (skip >= numTours) {
+        throw new Error("This page does not exist");
+      }
+    }
+
+    //Execute Query
+    const data = await somequery;
     res.status(201).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, data: error });
@@ -50,10 +107,10 @@ const updateTour = async (req, res) => {
     res.status(500).json({ success: false, data: error });
   }
 };
-const deleteTour = async(req, res) => {
+const deleteTour = async (req, res) => {
   try {
     const id = req.params.id;
-   
+
     const data = await Tour.findByIdAndDelete(id);
     res.status(201).json({ success: true, data });
   } catch (error) {
@@ -61,4 +118,37 @@ const deleteTour = async(req, res) => {
   }
 };
 
-export { getTours, getTour, createTour, updateTour, deleteTour };
+//agregation pipeline
+const getTourStats = async (req, res) => {
+  try {
+    const stats = await Tour.aggregate([
+      {
+        $match: { ratingAverage: { $gte: 4.5 } },
+      },
+      {
+        $group: {
+          _id: "$rating Average",
+          numTours: { $sum: 1 },
+          numRating: { $sum: "$ratingQuantity" },
+          avgRating: { $avg: "$ratingAverage" },
+          avgPrice: { $avg: "$price" },
+          minPrice: { $min: "$price" },
+          maxPrice: { $max: "$price" },
+        },
+      },
+    ]);
+    res.status(201).json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, data: error });
+  }
+};
+
+export {
+  getTours,
+  getTour,
+  createTour,
+  updateTour,
+  deleteTour,
+  aliasCheapTours,
+  getTourStats,
+};
