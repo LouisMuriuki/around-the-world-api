@@ -1,5 +1,5 @@
 import express from "express"
-import { getTours, getTour, createTour, updateTour, deleteTour ,aliasCheapTours,getTourStats} from "../contollers/tours.js"
+import { getTours, getTour, createTour, updateTour, deleteTour ,aliasCheapTours,getTourStats,getMonthlyPlan} from "../contollers/tours.js"
 const router=express.Router()
 
 
@@ -9,6 +9,7 @@ router.get("/top-5-cheap",aliasCheapTours,getTours)//aliasing
 // router.get("/cheap-tours",getTours)
 // router.get("/expensive-tours",getTours)
 router.get("/tour-stats",getTourStats)
+router.get("/monthly-plan/:year",getMonthlyPlan)
 router.get("/:id",getTour)
 router.post("/add",createTour)
 router.patch("/:id",updateTour)
